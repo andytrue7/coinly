@@ -1,8 +1,6 @@
-# Coinly — Senior-Level Fintech Portfolio Project
-
 ## Context
 
-The user (a backend developer targeting senior level) wants a learn-by-doing fintech project for their CV, covering: Go, REST, gRPC, PostgreSQL, MongoDB, Kafka, Redis, Docker, Kubernetes, CI/CD, Makefile, golangci-lint, microservices, saga, event-driven, hexagonal architecture. Decisions made with the user:
+The fintech project, covering: Go, REST, gRPC, PostgreSQL, MongoDB, Kafka, Redis, Docker, Kubernetes, CI/CD, Makefile, golangci-lint, microservices, saga, event-driven, hexagonal architecture. Decisions made with the user:
 
 - **Product:** *Coinly* — a digital wallet & payments platform (Wise/Revolut core): multi-currency wallets, P2P transfers, deposits/withdrawals via a simulated provider, currency exchange, double-entry ledger.
 - **Delivery:** phased roadmap — full target architecture designed up front, built in milestones, each phase ending demoable. Deep detail for Phase 1; later phases as outline.
