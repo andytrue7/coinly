@@ -1,0 +1,14 @@
+version: v2
+clean: true
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/andytrue7/coinly/gen/go
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: ../gen/go
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go
+    out: ../gen/go
+    opt: paths=source_relative

@@ -1,6 +1,15 @@
 .PHONY: help lint test test-integration proto proto-breaking build up down migrate-up migrate-create seed ci
 
 GOLANGCI_LINT_IMAGE := golangci/golangci-lint:v2.13.2
+BUF_IMAGE := bufbuild/buf:1.72.0
+
+# No .proto files exist until the first package is added (identity/v1, in
+# Phase 1 step 3); proto/proto-breaking no-op gracefully until then, same
+# pattern as lint/test on an empty go.work. `buf generate` uses remote
+# plugins (buf.build/protocolbuffers/go, buf.build/grpc/go) so the Docker
+# image only needs the buf CLI itself — no protoc-gen-go install, local or
+# in-image.
+PROTO_FILES := $(shell find proto -name '*.proto' 2>/dev/null)
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -39,11 +48,22 @@ test: ## Run unit tests across all modules
 test-integration: ## Run testcontainers integration tests (TODO: added in Phase 1 step 9)
 	@echo "TODO: not implemented yet"
 
-proto: ## Generate code from proto definitions via buf (TODO: added in Phase 1 step 3)
-	@echo "TODO: not implemented yet"
+proto: ## Lint and generate code from proto definitions via buf (Docker)
+	@if [ -z "$(PROTO_FILES)" ]; then \
+		echo "No .proto files yet — skipping proto lint/generate."; \
+	else \
+		echo "==> buf lint"; \
+		docker run --rm -v "$$PWD":/workspace -w /workspace/proto $(BUF_IMAGE) lint || exit 1; \
+		echo "==> buf generate"; \
+		docker run --rm -v "$$PWD":/workspace -w /workspace/proto $(BUF_IMAGE) generate || exit 1; \
+	fi
 
-proto-breaking: ## Run buf breaking-change check (TODO: added in Phase 1 step 3)
-	@echo "TODO: not implemented yet"
+proto-breaking: ## Run buf breaking-change check against main (Docker)
+	@if [ -z "$(PROTO_FILES)" ]; then \
+		echo "No .proto files yet — skipping breaking check."; \
+	else \
+		docker run --rm -v "$$PWD":/workspace -w /workspace/proto $(BUF_IMAGE) breaking --against '../.git#branch=main,subdir=proto' || exit 1; \
+	fi
 
 build: ## Build all service binaries (TODO: no services yet)
 	@echo "TODO: no services yet"
