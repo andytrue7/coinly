@@ -8,6 +8,29 @@ The user (a backend developer targeting senior level) wants a learn-by-doing fin
 - **Delivery:** phased roadmap — full target architecture designed up front, built in milestones, each phase ending demoable. Deep detail for Phase 1; later phases as outline.
 - The directory `/Users/andriitrubchanynov/Projects/practice/go/coinly` is empty (greenfield). Not yet a git repo — `git init` is step one.
 
+## Status
+
+- [ ] Phase 1 — Foundation (identity + wallet)
+  - [ ] 1. Scaffolding (git init, go.work, Makefile, .golangci.yml, CI skeleton, ADRs 0001–0003, README)
+  - [ ] 2. `pkg/money`
+  - [ ] 3. proto + buf (identity/v1, wallet/v1)
+  - [ ] 4. identity service (domain → app → Postgres → REST → JWKS)
+  - [ ] 5. wallet domain (entities + `Balanced()` invariant)
+  - [ ] 6. wallet app layer (use cases + ports + fakes)
+  - [ ] 7. wallet Postgres adapter (migrations, repos, UnitOfWork)
+  - [ ] 8. wallet REST + gRPC adapters, JWT middleware
+  - [ ] 9. Integration tests (testcontainers, concurrency test, reconciliation)
+  - [ ] 10. docker-compose + seed script + README demo walkthrough
+- [ ] Phase 2 — Kafka + outbox + first consumers
+- [ ] Phase 3 — Payments + withdrawal saga
+- [ ] Phase 4 — Exchange + CQRS history
+- [ ] Phase 5 — Gateway + Kubernetes + observability
+- [ ] Phase 6 — Hardening & performance
+
+## Log
+
+(none yet)
+
 ## Target architecture (end state)
 
 ### Services & data ownership
