@@ -9,7 +9,7 @@ The fintech project, covering: Go, REST, gRPC, PostgreSQL, MongoDB, Kafka, Redis
 ## Status
 
 - [ ] Phase 1 — Foundation (identity + wallet)
-  - [ ] 1. Scaffolding (git init, go.work, Makefile, .golangci.yml, CI skeleton, ADRs 0001–0003, README)
+  - [x] 1. Scaffolding (git init, go.work, Makefile, .golangci.yml, CI skeleton, ADRs 0001–0003, README)
   - [ ] 2. `pkg/money`
   - [ ] 3. proto + buf (identity/v1, wallet/v1)
   - [ ] 4. identity service (domain → app → Postgres → REST → JWKS)
@@ -27,7 +27,34 @@ The fintech project, covering: Go, REST, gRPC, PostgreSQL, MongoDB, Kafka, Redis
 
 ## Log
 
-(none yet)
+### Phase 1, step 1 — Scaffolding (done)
+
+Built on branch `phase-1-scaffolding` (not `main` — see CLAUDE.md git
+workflow rule) as 5 commits: go.work + Makefile skeleton; `.golangci.yml`;
+CI workflow; ADRs 0001–0003; README.
+
+Key decisions/deviations from a literal read of the plan:
+- `go.work` has no `use` entries yet (no Go modules exist); `make lint`
+  and `make test` no-op gracefully until the first module is added
+  (verified both `golangci-lint` and `go test ./...` hard-error on an
+  empty workspace otherwise), then run for real automatically.
+- `golangci-lint` runs via a pinned Docker image
+  (`golangci/golangci-lint:v2.13.2`), not a host install or GitHub Action,
+  per standing preference for dockerized dev tooling; CI calls `make lint`
+  so local and CI behavior can't drift apart.
+- Found and fixed a real `.golangci.yml` bug by actually running the
+  linter: `goimports` belongs under `formatters`, not `linters.enable`,
+  in golangci-lint v2.
+- The plan's full CI design (path-filtered matrix, buf checks, per-service
+  Docker builds to GHCR) needs services/protos to filter and build against
+  — none exist yet, so CI is currently just unconditional lint+test jobs.
+  Not a plan change, just sequencing: the matrix/buf/build jobs get added
+  once step 3 (proto) and step 4 (identity) land.
+- Only ADRs 1–3 are written (monorepo, money type, UUIDv7 IDs); ADRs 4–9
+  from the "ADRs to write" list land alongside the phases/decisions they
+  document (e.g. the saga ADR once withdrawal saga work starts in Phase 3).
+
+Next: Phase 1 step 2, `pkg/money`.
 
 ## Target architecture (end state)
 
