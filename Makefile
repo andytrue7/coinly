@@ -1,13 +1,28 @@
 .PHONY: help lint test test-integration proto proto-breaking build up down migrate-up migrate-create seed ci
 
+GOLANGCI_LINT_IMAGE := golangci/golangci-lint:v2.13.2
+
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
 
-lint: ## Run golangci-lint across all modules (TODO: no modules yet)
-	@echo "TODO: no Go modules in go.work yet"
+# go.work has no `use` entries until the first module is added (pkg/money,
+# in Phase 1 step 2). `go test`/`golangci-lint` error on an empty workspace,
+# so lint/test no-op gracefully until then; both run for real automatically
+# once a module exists.
 
-test: ## Run unit tests across all modules (TODO: no modules yet)
-	@echo "TODO: no Go modules in go.work yet"
+lint: ## Run golangci-lint (pinned, via Docker) across all modules
+	@if ! grep -q '^use' go.work 2>/dev/null; then \
+		echo "No Go modules in go.work yet — skipping lint."; \
+	else \
+		docker run --rm -v "$$PWD":/workspace -w /workspace $(GOLANGCI_LINT_IMAGE) golangci-lint run ./...; \
+	fi
+
+test: ## Run unit tests across all modules
+	@if ! grep -q '^use' go.work 2>/dev/null; then \
+		echo "No Go modules in go.work yet — skipping tests."; \
+	else \
+		go test -race -cover ./...; \
+	fi
 
 test-integration: ## Run testcontainers integration tests (TODO: added in Phase 1 step 9)
 	@echo "TODO: not implemented yet"
