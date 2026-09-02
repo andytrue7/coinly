@@ -6,22 +6,34 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
 
 # go.work has no `use` entries until the first module is added (pkg/money,
-# in Phase 1 step 2). `go test`/`golangci-lint` error on an empty workspace,
-# so lint/test no-op gracefully until then; both run for real automatically
-# once a module exists.
+# in Phase 1 step 2); lint/test no-op gracefully until then. Once modules
+# exist, lint/test iterate each workspace module directory individually and
+# run `./...` from inside it, rather than `./...` from the repo root: the
+# repo root itself has no go.mod (only services/modules under it do), and
+# both `go test` and `golangci-lint` refuse a `./...` pattern whose
+# directory prefix isn't itself inside a `use`d module — confirmed by
+# running each against this workspace directly.
+MODULE_DIRS := $(shell go list -m -f '{{.Dir}}' all 2>/dev/null)
 
 lint: ## Run golangci-lint (pinned, via Docker) across all modules
-	@if ! grep -q '^use' go.work 2>/dev/null; then \
+	@if [ -z "$(MODULE_DIRS)" ]; then \
 		echo "No Go modules in go.work yet — skipping lint."; \
 	else \
-		docker run --rm -v "$$PWD":/workspace -w /workspace $(GOLANGCI_LINT_IMAGE) golangci-lint run ./...; \
+		for d in $(MODULE_DIRS); do \
+			rel=$${d#$$PWD/}; \
+			echo "==> lint $$rel"; \
+			docker run --rm -v "$$PWD":/workspace -w "/workspace/$$rel" $(GOLANGCI_LINT_IMAGE) golangci-lint run ./... || exit 1; \
+		done; \
 	fi
 
 test: ## Run unit tests across all modules
-	@if ! grep -q '^use' go.work 2>/dev/null; then \
+	@if [ -z "$(MODULE_DIRS)" ]; then \
 		echo "No Go modules in go.work yet — skipping tests."; \
 	else \
-		go test -race -cover ./...; \
+		for d in $(MODULE_DIRS); do \
+			echo "==> test $$d"; \
+			(cd "$$d" && go test -race -cover ./...) || exit 1; \
+		done; \
 	fi
 
 test-integration: ## Run testcontainers integration tests (TODO: added in Phase 1 step 9)
