@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(git *)"
+    ],
+    "ask": [
+      "Edit",
+      "Write",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "deny": [
+	  "Bash(git push *)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -rf *)",
+      "Read(.env)",
+      "Read(**/secrets/**)",
+      "Bash(curl * | bash)",
+      "Bash(curl * | sh)"
+    ]
+  },
+  "includeCoAuthoredBy": false
+}
