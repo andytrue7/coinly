@@ -10,7 +10,7 @@ The fintech project, covering: Go, REST, gRPC, PostgreSQL, MongoDB, Kafka, Redis
 
 - [ ] Phase 1 — Foundation (identity + wallet)
   - [x] 1. Scaffolding (git init, go.work, Makefile, .golangci.yml, CI skeleton, ADRs 0001–0003, README)
-  - [ ] 2. `pkg/money`
+  - [x] 2. `pkg/money`
   - [ ] 3. proto + buf (identity/v1, wallet/v1)
   - [ ] 4. identity service (domain → app → Postgres → REST → JWKS)
   - [ ] 5. wallet domain (entities + `Balanced()` invariant)
@@ -55,6 +55,32 @@ Key decisions/deviations from a literal read of the plan:
   document (e.g. the saga ADR once withdrawal saga work starts in Phase 3).
 
 Next: Phase 1 step 2, `pkg/money`.
+
+### Phase 1, step 2 — `pkg/money` (done)
+
+Built on branch `phase-1-money` as 2 commits: a Makefile/tooling fix, then
+the `pkg/money` package itself (tests written first, 100% statement
+coverage). Implements ADR 0002 as designed: `Money{amount int64,
+currency string}`, `Add`/`Sub`/`Neg`/`Split`, exponent table.
+
+Key decisions/deviations from a literal read of the plan:
+- Discovered that `go test ./...` and `golangci-lint run ./...`, run from
+  the repo root, both error once a real module exists — Go workspaces
+  reject a `./...` pattern whose directory prefix (the root, which has no
+  `go.mod` of its own) isn't itself inside a `use`d module directory.
+  Fixed the `lint`/`test` Makefile targets to iterate each workspace
+  module's directory and run `./...` from inside it instead — scales to
+  `services/*` later with no further Makefile changes. Not a plan change,
+  just a tooling fix the scaffolding step's assumption didn't anticipate.
+- `Add`/`Sub` return `(Money, error)` on currency mismatch rather than
+  panicking, to match the error-returning style the rest of the codebase
+  will use, and because this type sits under the ledger's zero-sum
+  invariant.
+- No major-unit display/formatting method (`String()`) added — that's an
+  "edges" (API/logs) concern per ADR 0002, out of this step's scope;
+  left for whichever service/adapter needs it later.
+
+Next: Phase 1 step 3, proto + buf (identity/v1, wallet/v1).
 
 ## Target architecture (end state)
 
