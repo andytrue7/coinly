@@ -17,6 +17,7 @@ Project overview, tech stack, and architecture: see [README.md](README.md) and [
 - After each small chunk works, stop and let me review before continuing.
 
 ## Git workflow
+- Don't commit to `main` — branch first.
 - Propose a clear, conventional commit message for each change (one logical change per commit). 
 - If a task would touch many files or mix concerns, tell me first and suggest how to split it into smaller commits before starting. 
 

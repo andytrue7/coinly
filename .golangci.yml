@@ -1,0 +1,50 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - revive
+    - gosec
+    - sqlclosecheck
+    - rowserrcheck
+    - errorlint
+    - exhaustive
+    - copyloopvar
+    - depguard
+    - misspell
+    - unparam
+    - unconvert
+    - gocritic
+
+  settings:
+    depguard:
+      rules:
+        # Hexagonal layering, per service: domain is pure and imports
+        # nothing from its own service; app may use domain; adapters may
+        # use domain+app; cmd wires everything. No service may reach into
+        # another service's internal/ packages.
+        domain:
+          files:
+            - "**/internal/domain/**"
+          deny:
+            - pkg: "**/internal/app"
+              desc: "domain must not import app (domain is pure)"
+            - pkg: "**/internal/adapters"
+              desc: "domain must not import adapters (domain is pure)"
+        app:
+          files:
+            - "**/internal/app/**"
+          deny:
+            - pkg: "**/internal/adapters"
+              desc: "app must not import adapters (depend on ports instead)"
+
+formatters:
+  enable:
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

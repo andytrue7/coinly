@@ -1,0 +1,26 @@
+# Build output
+/bin/
+/dist/
+*.exe
+*.test
+
+# Test/coverage output
+*.out
+coverage.txt
+coverage.html
+
+# Env files (never commit real secrets/config)
+.env
+.env.*
+!.env.example
+
+# Docker Compose local overrides
+docker-compose.override.yml
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
