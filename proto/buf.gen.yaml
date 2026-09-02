@@ -1,5 +1,7 @@
 version: v2
-clean: true
+# clean is deliberately NOT set: gen/go is also a hand-authored Go module
+# (go.mod/go.sum live at its root), and `clean: true` deletes everything
+# under `out` before regenerating — verified the hard way, it wiped go.mod.
 managed:
   enabled: true
   override:

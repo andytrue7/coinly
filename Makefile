@@ -22,7 +22,12 @@ help: ## Show this help
 # both `go test` and `golangci-lint` refuse a `./...` pattern whose
 # directory prefix isn't itself inside a `use`d module — confirmed by
 # running each against this workspace directly.
-MODULE_DIRS := $(shell go list -m -f '{{.Dir}}' all 2>/dev/null)
+# `all` lists every module in the build graph, workspace members and their
+# transitive dependencies alike; `{{if .Main}}` filters to just the
+# workspace's own modules — a distinction that didn't matter while pkg had
+# zero third-party deps, but broke once gen/go's grpc/protobuf deps entered
+# the graph (lint tried to run inside the module cache and errored).
+MODULE_DIRS := $(shell go list -m -f '{{if .Main}}{{.Dir}}{{end}}' all 2>/dev/null)
 
 lint: ## Run golangci-lint (pinned, via Docker) across all modules
 	@if [ -z "$(MODULE_DIRS)" ]; then \
@@ -61,6 +66,8 @@ proto: ## Lint and generate code from proto definitions via buf (Docker)
 proto-breaking: ## Run buf breaking-change check against main (Docker)
 	@if [ -z "$(PROTO_FILES)" ]; then \
 		echo "No .proto files yet — skipping breaking check."; \
+	elif [ -z "$$(git ls-tree -r main --name-only -- proto 2>/dev/null | grep '\.proto$$')" ]; then \
+		echo "main has no .proto files yet — nothing to check breaking changes against."; \
 	else \
 		docker run --rm -v "$$PWD":/workspace -w /workspace/proto $(BUF_IMAGE) breaking --against '../.git#branch=main,subdir=proto' || exit 1; \
 	fi
