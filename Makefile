@@ -90,4 +90,4 @@ migrate-create: ## Create a new goose migration (TODO: added with wallet Postgre
 seed: ## Seed demo data (TODO: added in Phase 1 step 10)
 	@echo "TODO: not implemented yet"
 
-ci: lint test ## Run the checks CI runs
+ci: lint test proto proto-breaking ## Run the checks CI runs
