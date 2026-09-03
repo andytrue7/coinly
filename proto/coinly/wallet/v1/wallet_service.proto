@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package coinly.wallet.v1;
+
+import "coinly/wallet/v1/money.proto";
+
+// WalletService is internal-only gRPC, defined now and consumed by the
+// payments service starting Phase 3 (withdrawal saga: CreateHold ->
+// provider-sim -> CaptureHold/ReleaseHold). See docs/PLAN.md.
+service WalletService {
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+  rpc CreateHold(CreateHoldRequest) returns (CreateHoldResponse);
+  rpc CaptureHold(CaptureHoldRequest) returns (CaptureHoldResponse);
+  rpc ReleaseHold(ReleaseHoldRequest) returns (ReleaseHoldResponse);
+  rpc PostJournal(PostJournalRequest) returns (PostJournalResponse);
+}
+
+message GetBalanceRequest {
+  string wallet_id = 1;
+}
+
+message GetBalanceResponse {
+  // available = balance - held.
+  Money available = 1;
+  Money held = 2;
+}
+
+message CreateHoldRequest {
+  string wallet_id = 1;
+  Money amount = 2;
+  string idempotency_key = 3;
+  string note = 4;
+}
+
+message CreateHoldResponse {
+  // hold_id is the id of the journal entry that moved amount from
+  // user_available to user_held; CaptureHold/ReleaseHold reference it.
+  string hold_id = 1;
+}
+
+message CaptureHoldRequest {
+  string hold_id = 1;
+  string idempotency_key = 2;
+}
+
+message CaptureHoldResponse {
+  string journal_id = 1;
+}
+
+message ReleaseHoldRequest {
+  string hold_id = 1;
+  string idempotency_key = 2;
+}
+
+message ReleaseHoldResponse {
+  string journal_id = 1;
+}
+
+// Posting is one leg of a journal entry. Per (journal, currency), postings
+// must sum to zero — enforced in the domain layer, not by this message.
+message Posting {
+  string account_id = 1;
+  int64 amount = 2;
+  string currency = 3;
+}
+
+message PostJournalRequest {
+  string kind = 1;
+  string idempotency_key = 2;
+  string initiated_by = 3;
+  string note = 4;
+  repeated Posting postings = 5;
+}
+
+message PostJournalResponse {
+  string journal_id = 1;
+}
