@@ -2,3 +2,4 @@ go 1.25.0
 
 use ./pkg
 use ./gen/go
+use ./services/identity
