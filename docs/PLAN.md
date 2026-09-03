@@ -11,7 +11,7 @@ The fintech project, covering: Go, REST, gRPC, PostgreSQL, MongoDB, Kafka, Redis
 - [ ] Phase 1 — Foundation (identity + wallet)
   - [x] 1. Scaffolding (git init, go.work, Makefile, .golangci.yml, CI skeleton, ADRs 0001–0003, README)
   - [x] 2. `pkg/money`
-  - [ ] 3. proto + buf (identity/v1, wallet/v1)
+  - [x] 3. proto + buf (identity/v1, wallet/v1)
   - [ ] 4. identity service (domain → app → Postgres → REST → JWKS)
   - [ ] 5. wallet domain (entities + `Balanced()` invariant)
   - [ ] 6. wallet app layer (use cases + ports + fakes)
@@ -81,6 +81,49 @@ Key decisions/deviations from a literal read of the plan:
   left for whichever service/adapter needs it later.
 
 Next: Phase 1 step 3, proto + buf (identity/v1, wallet/v1).
+
+### Phase 1, step 3 — proto + buf (done)
+
+Built on branch `phase-1-proto` as 4 commits: buf tooling scaffold;
+`identity/v1` (`User`, `UserService.GetUser`) + `gen/go` module;
+`wallet/v1` (`Money`, `WalletService` — GetBalance/CreateHold/CaptureHold/
+ReleaseHold/PostJournal); CI wiring (`buf lint` + `buf breaking` job).
+
+Key decisions/deviations from a literal read of the plan:
+- `buf generate` uses **remote plugin execution**
+  (`buf.build/protocolbuffers/go`, `buf.build/grpc/go`) rather than a
+  local install or a custom Docker image bundling protoc-gen-go — the
+  pinned `bufbuild/buf` Docker image alone is enough, no Dockerfile to
+  maintain, consistent with the dockerized-dev-tooling preference. Trade-
+  off: `make proto` needs network access to the BSR.
+- `Money` (int64 minor units + currency, mirroring `pkg/money.Money`) is
+  defined inside `wallet/v1`, not a shared `common/v1` package — no second
+  consumer exists yet to justify one.
+- `go.work`'s `go` directive moved `1.23` → `1.25.0`: `go mod tidy` raised
+  `gen/go`'s own directive to satisfy `google.golang.org/grpc`'s actual
+  minimum. `pkg/go.mod` stays at `1.23` — a workspace directive only needs
+  to be ≥ its highest member's, so this doesn't force other modules up.
+- Two real bugs found by actually running the pipeline (not from
+  inspection): `buf.gen.yaml`'s `clean: true` deleted `gen/go/go.mod` on
+  every regenerate, since the hand-authored module file lives inside the
+  directory buf cleans before writing generated code — fixed by dropping
+  `clean`. And the `Makefile`'s `MODULE_DIRS` (`go list -m -f '{{.Dir}}'
+  all`) silently started including every transitive dependency, not just
+  workspace modules, the moment `gen/go` had real deps (grpc/protobuf) —
+  invisible while `pkg` had none — breaking `lint`; fixed by filtering to
+  `{{if .Main}}`.
+- `proto-breaking` needed a guard for the case where `main` doesn't have
+  any `.proto` files yet (true until this branch merges): `buf breaking`
+  errors rather than passing on an empty "against" side, so it now checks
+  `git ls-tree main -- proto` first and skips gracefully if empty, same
+  no-op-until-ready pattern as `lint`/`test`. Once this branch merges, the
+  check goes live for real — verified in an isolated clone (not a shared
+  worktree) against three scenarios: skip when main has no proto, real
+  pass on no diff, and a real catch of a deliberately-introduced breaking
+  change (field removal).
+
+Next: Phase 1 step 4, identity service (domain → app → Postgres → REST →
+JWKS).
 
 ## Target architecture (end state)
 

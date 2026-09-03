@@ -20,3 +20,18 @@ jobs:
         with:
           go-version-file: go.work
       - run: make test
+
+  proto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so `origin/main` is available to diff against;
+          # a shallow (default depth-1) clone would only have this commit.
+          fetch-depth: 0
+      # `make proto-breaking` diffs against local branch `main` (same as a
+      # dev's checkout); actions/checkout leaves HEAD detached and doesn't
+      # create that local branch, so point it at origin/main first.
+      - run: git branch -f main origin/main
+      - run: make proto
+      - run: make proto-breaking

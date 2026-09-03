@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package coinly.wallet.v1;
+
+// Money mirrors pkg/money.Money: an exact signed amount in minor currency
+// units (no floats), plus its ISO-4217 currency code.
+message Money {
+  int64 amount = 1;
+  string currency = 2;
+}

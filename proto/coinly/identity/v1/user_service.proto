@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package coinly.identity.v1;
+
+import "coinly/identity/v1/user.proto";
+
+// UserService is internal-only, consumed service-to-service via gRPC for
+// user enrichment. All user-facing auth flows (register/login/refresh/
+// logout, JWKS) are REST, not gRPC — see docs/PLAN.md.
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}

@@ -1,6 +1,15 @@
 .PHONY: help lint test test-integration proto proto-breaking build up down migrate-up migrate-create seed ci
 
 GOLANGCI_LINT_IMAGE := golangci/golangci-lint:v2.13.2
+BUF_IMAGE := bufbuild/buf:1.72.0
+
+# No .proto files exist until the first package is added (identity/v1, in
+# Phase 1 step 3); proto/proto-breaking no-op gracefully until then, same
+# pattern as lint/test on an empty go.work. `buf generate` uses remote
+# plugins (buf.build/protocolbuffers/go, buf.build/grpc/go) so the Docker
+# image only needs the buf CLI itself — no protoc-gen-go install, local or
+# in-image.
+PROTO_FILES := $(shell find proto -name '*.proto' 2>/dev/null)
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -13,7 +22,12 @@ help: ## Show this help
 # both `go test` and `golangci-lint` refuse a `./...` pattern whose
 # directory prefix isn't itself inside a `use`d module — confirmed by
 # running each against this workspace directly.
-MODULE_DIRS := $(shell go list -m -f '{{.Dir}}' all 2>/dev/null)
+# `all` lists every module in the build graph, workspace members and their
+# transitive dependencies alike; `{{if .Main}}` filters to just the
+# workspace's own modules — a distinction that didn't matter while pkg had
+# zero third-party deps, but broke once gen/go's grpc/protobuf deps entered
+# the graph (lint tried to run inside the module cache and errored).
+MODULE_DIRS := $(shell go list -m -f '{{if .Main}}{{.Dir}}{{end}}' all 2>/dev/null)
 
 lint: ## Run golangci-lint (pinned, via Docker) across all modules
 	@if [ -z "$(MODULE_DIRS)" ]; then \
@@ -39,11 +53,24 @@ test: ## Run unit tests across all modules
 test-integration: ## Run testcontainers integration tests (TODO: added in Phase 1 step 9)
 	@echo "TODO: not implemented yet"
 
-proto: ## Generate code from proto definitions via buf (TODO: added in Phase 1 step 3)
-	@echo "TODO: not implemented yet"
+proto: ## Lint and generate code from proto definitions via buf (Docker)
+	@if [ -z "$(PROTO_FILES)" ]; then \
+		echo "No .proto files yet — skipping proto lint/generate."; \
+	else \
+		echo "==> buf lint"; \
+		docker run --rm -v "$$PWD":/workspace -w /workspace/proto $(BUF_IMAGE) lint || exit 1; \
+		echo "==> buf generate"; \
+		docker run --rm -v "$$PWD":/workspace -w /workspace/proto $(BUF_IMAGE) generate || exit 1; \
+	fi
 
-proto-breaking: ## Run buf breaking-change check (TODO: added in Phase 1 step 3)
-	@echo "TODO: not implemented yet"
+proto-breaking: ## Run buf breaking-change check against main (Docker)
+	@if [ -z "$(PROTO_FILES)" ]; then \
+		echo "No .proto files yet — skipping breaking check."; \
+	elif [ -z "$$(git ls-tree -r main --name-only -- proto 2>/dev/null | grep '\.proto$$')" ]; then \
+		echo "main has no .proto files yet — nothing to check breaking changes against."; \
+	else \
+		docker run --rm -v "$$PWD":/workspace -w /workspace/proto $(BUF_IMAGE) breaking --against '../.git#branch=main,subdir=proto' || exit 1; \
+	fi
 
 build: ## Build all service binaries (TODO: no services yet)
 	@echo "TODO: no services yet"
@@ -63,4 +90,4 @@ migrate-create: ## Create a new goose migration (TODO: added with wallet Postgre
 seed: ## Seed demo data (TODO: added in Phase 1 step 10)
 	@echo "TODO: not implemented yet"
 
-ci: lint test ## Run the checks CI runs
+ci: lint test proto proto-breaking ## Run the checks CI runs

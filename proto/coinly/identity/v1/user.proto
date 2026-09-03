@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package coinly.identity.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// User is the internal, gRPC-facing view of an identity user: no
+// credential material (e.g. password_hash) ever crosses this boundary.
+message User {
+  string id = 1;
+  string email = 2;
+  UserStatus status = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_ACTIVE = 1;
+  USER_STATUS_SUSPENDED = 2;
+}
