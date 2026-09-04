@@ -36,7 +36,7 @@ lint: ## Run golangci-lint (pinned, via Docker) across all modules
 		for d in $(MODULE_DIRS); do \
 			rel=$${d#$$PWD/}; \
 			echo "==> lint $$rel"; \
-			docker run --rm -v "$$PWD":/workspace -w "/workspace/$$rel" $(GOLANGCI_LINT_IMAGE) golangci-lint run ./... || exit 1; \
+			docker run --rm -v "$$PWD":/workspace -w "/workspace/$$rel" $(GOLANGCI_LINT_IMAGE) golangci-lint run --build-tags integration ./... || exit 1; \
 		done; \
 	fi
 
@@ -50,8 +50,18 @@ test: ## Run unit tests across all modules
 		done; \
 	fi
 
-test-integration: ## Run testcontainers integration tests (TODO: added in Phase 1 step 9)
-	@echo "TODO: not implemented yet"
+# Integration tests are behind the `integration` build tag so plain `make
+# test` never needs a Docker daemon; this target runs the tagged packages
+# (testcontainers spins up real Postgres etc.) plus the unit tests again.
+test-integration: ## Run testcontainers integration tests (needs Docker)
+	@if [ -z "$(MODULE_DIRS)" ]; then \
+		echo "No Go modules in go.work yet — skipping integration tests."; \
+	else \
+		for d in $(MODULE_DIRS); do \
+			echo "==> test-integration $$d"; \
+			(cd "$$d" && go test -race -tags integration ./...) || exit 1; \
+		done; \
+	fi
 
 proto: ## Lint and generate code from proto definitions via buf (Docker)
 	@if [ -z "$(PROTO_FILES)" ]; then \
@@ -72,8 +82,16 @@ proto-breaking: ## Run buf breaking-change check against main (Docker)
 		docker run --rm -v "$$PWD":/workspace -w /workspace/proto $(BUF_IMAGE) breaking --against '../.git#branch=main,subdir=proto' || exit 1; \
 	fi
 
-build: ## Build all service binaries (TODO: no services yet)
-	@echo "TODO: no services yet"
+# One binary per services/<name>/cmd/<name>, written to bin/<name>.
+SERVICE_DIRS := $(wildcard services/*)
+
+build: ## Build all service binaries into bin/
+	@mkdir -p bin
+	@for d in $(SERVICE_DIRS); do \
+		name=$$(basename "$$d"); \
+		echo "==> build $$name"; \
+		(cd "$$d" && go build -o "../../bin/$$name" "./cmd/$$name") || exit 1; \
+	done
 
 up: ## Start the local dev stack via docker compose (TODO: added in Phase 1 step 10)
 	@echo "TODO: not implemented yet"

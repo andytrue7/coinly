@@ -1,4 +1,5 @@
-go 1.25.0
+go 1.25.7
 
 use ./pkg
 use ./gen/go
+use ./services/identity

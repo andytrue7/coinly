@@ -12,7 +12,7 @@ The fintech project, covering: Go, REST, gRPC, PostgreSQL, MongoDB, Kafka, Redis
   - [x] 1. Scaffolding (git init, go.work, Makefile, .golangci.yml, CI skeleton, ADRs 0001–0003, README)
   - [x] 2. `pkg/money`
   - [x] 3. proto + buf (identity/v1, wallet/v1)
-  - [ ] 4. identity service (domain → app → Postgres → REST → JWKS)
+  - [x] 4. identity service (domain → app → Postgres → REST → JWKS)
   - [ ] 5. wallet domain (entities + `Balanced()` invariant)
   - [ ] 6. wallet app layer (use cases + ports + fakes)
   - [ ] 7. wallet Postgres adapter (migrations, repos, UnitOfWork)
@@ -124,6 +124,78 @@ Key decisions/deviations from a literal read of the plan:
 
 Next: Phase 1 step 4, identity service (domain → app → Postgres → REST →
 JWKS).
+
+### Phase 1, step 4 — identity service (done)
+
+Built on branch `phase-1-identity` as 9 commits, each layer tests-first:
+module scaffold; `pkg/ids` (UUIDv7); domain (`User`, argon2id
+`PasswordHasher`, `RefreshToken`, email normalization); app layer
+(`AuthService` Register/Login/Refresh/Logout/GetUser + ports + in-memory
+fakes); Postgres adapter (goose migrations, `UserRepo`,
+`RefreshTokenRepo`, testcontainers suite); `pkg/jwtx` (EdDSA JWT
+signer/verifier, JWKS, PEM keys) + identity token issuer; `pkg/httpx`
+(JSON helpers, bearer-JWT middleware); REST adapter; `cmd/identity`
+wiring with env config. Verified by a full smoke run of the built binary
+against a real Postgres: register → 409 on duplicate → login → `/me` →
+refresh → replay rejected → logout → JWKS → clean SIGTERM shutdown.
+
+Key decisions/deviations from a literal read of the plan:
+- **Shared `pkg/` grew three packages** the plan's layout already
+  reserved: `ids` (ADR 0003 said it would exist; nothing had needed it
+  yet), `jwtx` and `httpx`. The JWT verifier and bearer middleware live
+  in `pkg/` rather than in identity because wallet must verify the same
+  tokens locally in step 8 — one implementation of the audience/algorithm
+  checks, not two that can drift.
+- **Cross-module deps use `replace` directives** (`services/identity/go.mod`
+  → `../../pkg`) in addition to `go.work`, so a per-service Docker build
+  that copies only `pkg/` + the service still resolves. First
+  service→pkg dependency in the repo; wallet will follow the same shape.
+- **Argon2id, not bcrypt**, with cost parameters embedded in each PHC hash
+  so raising the defaults later never invalidates stored hashes. Login on
+  an unknown email still runs the KDF so response time doesn't reveal
+  which addresses exist.
+- **Refresh tokens rotate on every use; presenting any revoked token
+  revokes every session for that user** (OAuth reuse detection). This
+  deliberately includes a token revoked by logout — nobody legitimate
+  holds it afterwards, so a replay means someone else does. Trade-off: a
+  buggy client retrying a stale refresh after logout logs the user out
+  everywhere. Exempting logout would need a revocation-reason field on
+  the domain entity; deferred unless it bites.
+- **No UnitOfWork in identity.** Refresh does two repo writes (revoke old,
+  create new); the only partial-failure outcome is a forced re-login,
+  which doesn't justify the abstraction. Wallet gets a real one in step 7
+  where the ledger invariant demands it.
+- **Ports live in `internal/app/ports.go`**, not the sketched
+  `ports/{in,out}` subpackage — two interfaces didn't earn a package, and
+  the service struct itself is the inbound port.
+- **Register returns a token pair**, not just the user, so the demo script
+  needs one call fewer.
+- **Tooling that changed:** `make test-integration` is real now (runs
+  `-tags integration` across modules; needs Docker) instead of waiting for
+  step 9, and `make lint` passes the same tag so tagged test files can't
+  rot unlinted (that immediately caught two gosec false positives).
+  `make build` produces `bin/<service>` per `services/*`. The CI
+  integration job itself is still step 9.
+- **Version pins forced by Go-directive requirements:** `x/crypto` is
+  v0.55.0 not v0.56.0 (the latter needs Go 1.26, which would bump the
+  whole workspace for one dep); goose v3.27.3 needs Go 1.25.7, so
+  `go.work` and the identity module moved 1.25.0 → 1.25.7 (patch-level,
+  CI picks it up from `go.work`).
+- **Dev key mode:** `IDENTITY_JWT_DEV_EPHEMERAL_KEY=true` generates a
+  throwaway Ed25519 key at startup (tokens die on restart; logged as a
+  warning). Production requires `IDENTITY_JWT_PRIVATE_KEY_FILE` (PKCS#8
+  PEM). The compose stack in step 10 should mount a generated key file
+  rather than use ephemeral mode, or wallet's cached JWKS goes stale on
+  every identity restart.
+- **Not done yet from the step's sketch:** the gRPC `UserService.GetUser`
+  server (proto exists; no consumer until Phase 3 enrichment, so it lands
+  with the wallet gRPC adapter in step 8 alongside `pkg/grpcx`), and ADR
+  0006 (JWT EdDSA + JWKS + rotating hashed refresh tokens) — the decisions
+  are all made above; writing it up is a small docs commit to do before
+  the PR merges.
+
+Next: Phase 1 step 5, wallet domain (entities + `Balanced()` zero-sum
+invariant + domain tests incl. multi-currency journal).
 
 ## Target architecture (end state)
 
