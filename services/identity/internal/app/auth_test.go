@@ -76,7 +76,7 @@ func TestRegister(t *testing.T) {
 	}
 
 	// A refresh token was persisted for the user.
-	if n := h.tokens.activeCount(res.User.ID, t0); n != 1 {
+	if n := h.tokens.ActiveCount(res.User.ID, t0); n != 1 {
 		t.Errorf("active refresh tokens = %d, want 1", n)
 	}
 }
@@ -121,7 +121,7 @@ func TestRegister_Validation(t *testing.T) {
 func TestRegister_RepoError(t *testing.T) {
 	h := newHarness()
 	boom := errors.New("db down")
-	h.users.failing = boom
+	h.users.Failing = boom
 
 	_, err := h.svc.Register(context.Background(), email, password)
 	if !errors.Is(err, boom) {
@@ -132,7 +132,7 @@ func TestRegister_RepoError(t *testing.T) {
 func TestRegister_IssuerError(t *testing.T) {
 	h := newHarness()
 	boom := errors.New("no signing key")
-	h.issuer.err = boom
+	h.issuer.Err = boom
 
 	_, err := h.svc.Register(context.Background(), email, password)
 	if !errors.Is(err, boom) {
@@ -161,7 +161,7 @@ func TestLogin(t *testing.T) {
 		t.Error("Login reused the registration refresh token; each login must mint its own")
 	}
 	// Both sessions remain valid: logging in elsewhere doesn't log out here.
-	if n := h.tokens.activeCount(reg.User.ID, h.clock.Now()); n != 2 {
+	if n := h.tokens.ActiveCount(reg.User.ID, h.clock.Now()); n != 2 {
 		t.Errorf("active refresh tokens = %d, want 2", n)
 	}
 }
@@ -179,7 +179,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 func TestLogin_UnknownEmail(t *testing.T) {
 	h := newHarness()
 
-	before := h.hasher.calls()
+	before := h.hasher.Calls()
 	_, err := h.svc.Login(context.Background(), "nobody@example.com", password)
 
 	// Same error as a wrong password: don't reveal which emails exist.
@@ -190,7 +190,7 @@ func TestLogin_UnknownEmail(t *testing.T) {
 		t.Error("Login must not leak ErrUserNotFound")
 	}
 	// And the KDF still ran, so timing doesn't reveal it either.
-	if h.hasher.calls() == before {
+	if h.hasher.Calls() == before {
 		t.Error("hasher was not invoked for unknown email; timing side-channel")
 	}
 }
@@ -223,7 +223,7 @@ func TestLogin_Suspended(t *testing.T) {
 func TestLogin_RepoError(t *testing.T) {
 	h := newHarness()
 	boom := errors.New("db down")
-	h.users.failing = boom
+	h.users.Failing = boom
 
 	_, err := h.svc.Login(context.Background(), email, password)
 	if !errors.Is(err, boom) {
@@ -255,7 +255,7 @@ func TestRefresh_Rotates(t *testing.T) {
 	}
 
 	// Old token is dead, new one is the only live session.
-	if n := h.tokens.activeCount(reg.User.ID, h.clock.Now()); n != 1 {
+	if n := h.tokens.ActiveCount(reg.User.ID, h.clock.Now()); n != 1 {
 		t.Errorf("active refresh tokens = %d, want 1 (old revoked, new created)", n)
 	}
 
@@ -283,7 +283,7 @@ func TestRefresh_ReuseRevokesAllSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := h.tokens.activeCount(reg.User.ID, h.clock.Now()); n != 2 {
+	if n := h.tokens.ActiveCount(reg.User.ID, h.clock.Now()); n != 2 {
 		t.Fatalf("precondition: active tokens = %d, want 2", n)
 	}
 
@@ -293,7 +293,7 @@ func TestRefresh_ReuseRevokesAllSessions(t *testing.T) {
 		t.Fatalf("replay err = %v, want %v", err, domain.ErrRefreshTokenRevoked)
 	}
 
-	if n := h.tokens.activeCount(reg.User.ID, h.clock.Now()); n != 0 {
+	if n := h.tokens.ActiveCount(reg.User.ID, h.clock.Now()); n != 0 {
 		t.Errorf("active tokens after reuse = %d, want 0 (all sessions revoked)", n)
 	}
 	for name, tok := range map[string]string{"rotated": rotated.RefreshToken, "other login": other.Tokens.RefreshToken} {
@@ -313,7 +313,7 @@ func TestRefresh_Expired(t *testing.T) {
 		t.Errorf("Refresh err = %v, want %v", err, domain.ErrRefreshTokenExpired)
 	}
 	// Expiry is not reuse; the other sessions must survive.
-	if n := h.tokens.activeCount(reg.User.ID, t0); n != 1 {
+	if n := h.tokens.ActiveCount(reg.User.ID, t0); n != 1 {
 		t.Errorf("token was revoked on expiry; active at t0 = %d, want 1", n)
 	}
 }
@@ -350,7 +350,7 @@ func TestRefresh_RepoError(t *testing.T) {
 	h := newHarness()
 	reg := mustRegister(t, h)
 	boom := errors.New("db down")
-	h.tokens.failing = boom
+	h.tokens.Failing = boom
 
 	_, err := h.svc.Refresh(context.Background(), reg.Tokens.RefreshToken)
 	if !errors.Is(err, boom) {
@@ -373,7 +373,7 @@ func TestLogout(t *testing.T) {
 	}
 
 	// Logout is per-session, not per-user: the other session is intact.
-	if n := h.tokens.activeCount(reg.User.ID, h.clock.Now()); n != 1 {
+	if n := h.tokens.ActiveCount(reg.User.ID, h.clock.Now()); n != 1 {
 		t.Errorf("active refresh tokens after Logout = %d, want 1", n)
 	}
 	if _, err := h.svc.Refresh(context.Background(), other.Tokens.RefreshToken); err != nil {
@@ -425,7 +425,7 @@ func TestLogout_RepoError(t *testing.T) {
 	h := newHarness()
 	reg := mustRegister(t, h)
 	boom := errors.New("db down")
-	h.tokens.failing = boom
+	h.tokens.Failing = boom
 
 	if err := h.svc.Logout(context.Background(), reg.Tokens.RefreshToken); !errors.Is(err, boom) {
 		t.Errorf("Logout err = %v, want wrapped %v", err, boom)
@@ -454,7 +454,7 @@ func TestGetUser(t *testing.T) {
 func TestGetUser_RepoError(t *testing.T) {
 	h := newHarness()
 	boom := errors.New("db down")
-	h.users.failing = boom
+	h.users.Failing = boom
 
 	if _, err := h.svc.GetUser(context.Background(), ids.New()); !errors.Is(err, boom) {
 		t.Errorf("GetUser err = %v, want wrapped %v", err, boom)
@@ -466,7 +466,7 @@ func TestGetUser_RepoError(t *testing.T) {
 func TestRegister_TokenRepoError(t *testing.T) {
 	h := newHarness()
 	boom := errors.New("db down")
-	h.tokens.failing = boom
+	h.tokens.Failing = boom
 
 	_, err := h.svc.Register(context.Background(), email, password)
 	if !errors.Is(err, boom) {
@@ -478,7 +478,7 @@ func TestRefresh_UserRepoError(t *testing.T) {
 	h := newHarness()
 	reg := mustRegister(t, h)
 	boom := errors.New("db down")
-	h.users.failing = boom
+	h.users.Failing = boom
 
 	_, err := h.svc.Refresh(context.Background(), reg.Tokens.RefreshToken)
 	if !errors.Is(err, boom) {
