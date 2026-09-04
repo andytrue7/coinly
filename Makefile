@@ -82,8 +82,16 @@ proto-breaking: ## Run buf breaking-change check against main (Docker)
 		docker run --rm -v "$$PWD":/workspace -w /workspace/proto $(BUF_IMAGE) breaking --against '../.git#branch=main,subdir=proto' || exit 1; \
 	fi
 
-build: ## Build all service binaries (TODO: no services yet)
-	@echo "TODO: no services yet"
+# One binary per services/<name>/cmd/<name>, written to bin/<name>.
+SERVICE_DIRS := $(wildcard services/*)
+
+build: ## Build all service binaries into bin/
+	@mkdir -p bin
+	@for d in $(SERVICE_DIRS); do \
+		name=$$(basename "$$d"); \
+		echo "==> build $$name"; \
+		(cd "$$d" && go build -o "../../bin/$$name" "./cmd/$$name") || exit 1; \
+	done
 
 up: ## Start the local dev stack via docker compose (TODO: added in Phase 1 step 10)
 	@echo "TODO: not implemented yet"
